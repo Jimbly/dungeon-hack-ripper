@@ -1,0 +1,6 @@
+node_modules/
+out2/
+out3/
+palettes/*.out
+fonts/*_font
+sheets/*.png
