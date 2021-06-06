@@ -4,20 +4,8 @@ const { mkdir } = require('./utils.js');
 
 const colorType = 6;
 
-function readPalette(palettefile) {
-  if (!palettefile) {
-    let pal = new Array(256);
-    for (let ii = 0; ii < 256; ++ii) {
-      pal[ii] = [ii,ii,ii,255];
-    }
-    pal[255][3] = 0;
-    return pal;
-  }
-  if (palettefile.split(';').length === 3) {
-    let s = palettefile.split(';');
-    return readPalettePair(s[0], s[1], Number(s[2]));
-  }
-  let buf = fs.readFileSync(`palettes/${palettefile}.out`);
+function readPaletteSub(filename) {
+  let buf = fs.readFileSync(`palettes/${filename}.out`);
   let num_colors = buf.readUInt16LE(0);
   let pal = new Array(num_colors);
   let idx = 0x1A;
@@ -27,26 +15,34 @@ function readPalette(palettefile) {
     let b = buf[idx++] * 4;
     pal[ii] = [r,g,b,255];
   }
-  if (pal.length === 256) {
-    pal[255][0] = 0;
-    pal[255][1] = 0;
-    pal[255][2] = 0;
-    pal[255][3] = 0;
-  }
   return pal;
 }
 
-function readPalettePair(base, overlay, offset) {
-  let pal1 = readPalette(base);
-  let pal2 = readPalette(overlay);
-  for (let ii = 0; ii < pal2.length; ++ii) {
-    pal1[offset + ii] = pal2[ii];
+function readPalette(palettefile) {
+  if (!palettefile) {
+    let pal = new Array(256);
+    for (let ii = 0; ii < 256; ++ii) {
+      pal[ii] = [ii,ii,ii,255];
+    }
+    pal[255][3] = 0;
+    return pal;
   }
-  pal1[255][0] = 0;
-  pal1[255][1] = 0;
-  pal1[255][2] = 0;
-  pal1[255][3] = 0;
-  return pal1;
+  let pal = new Array(256);
+  let keys = `0;${palettefile}`.split(';');
+  for (let ii = 0; ii < keys.length; ii+=2) {
+    let offset = Number(keys[ii]);
+    let fn = keys[ii+1];
+    let pal2 = readPaletteSub(fn);
+    for (let jj = 0; jj < pal2.length; ++jj) {
+      pal[offset + jj] = pal2[jj];
+    }
+  }
+
+  pal[255][0] = 0;
+  pal[255][1] = 0;
+  pal[255][2] = 0;
+  pal[255][3] = 0;
+  return pal;
 }
 
 function loadRawImage(imgfile) {
@@ -153,14 +149,16 @@ function detPalette(filename, paletteoverride) {
   if (filename.startsWith('Diff')) {
     return 'Diff_Base_Palette';
   }
-  return 'Main_Base_Palette;wall_floor_palette_00;240';
+  return 'Main_Base_Palette;240;wall_floor_palette_00;224;wall_floor_palette_19';
   //return 'Fixed_Palette'; // Not 256
   //return 'Main_Base_Palette';
 }
 
 let contained_240plus;
+let contained_238;
 function procImage(mode, imgfile, outfile, paletteoverride) {
   contained_240plus = false;
+  contained_238 = false;
   let img;
   if (mode === 0) {
     img = loadRawImage(imgfile);
@@ -181,6 +179,9 @@ function procImage(mode, imgfile, outfile, paletteoverride) {
       let pal_idx = buf[idx++];
       if (pal_idx >= 240 && pal_idx < 255 && pal_idx !== 253) { // 253 is a very dark shadow, who cares.
         contained_240plus = true;
+      }
+      if (pal_idx >= 235 && pal_idx <= 238) {
+        contained_238 = true;
       }
       for (let ii = 0; ii < 4; ++ii) {
         data[out_idx++] = pal[pal_idx][ii];
@@ -239,11 +240,12 @@ function scanAll() {
   }
   files.forEach(function (filename) {
     let cat = categorize(filename);
-    // if (cat !== 'walls') {
-    //   return;
-    // }
+    if (cat !== 'walls') {
+      return;
+    }
     let paletteoverride = null;
-    let twoforty=false;
+    let twoforty = false;
+    let twothirtyeight = false;
     let total = 0;
     for (let ii = 0; ; ++ii) {
       if (!procImage(1, `${filename}.${ii}`, `out2/${cat}/${filename}.${pad2(ii)}.png`, paletteoverride)) {
@@ -251,14 +253,15 @@ function scanAll() {
       }
       ++total;
       twoforty = twoforty || contained_240plus;
+      twothirtyeight = twothirtyeight || contained_238;
     }
     if (twoforty) {
-      // output with each of the palettes
-      for (let pal = 1; pal < 21; ++pal) {
-        paletteoverride = `Main_Base_Palette;wall_floor_palette_${pad2(pal)};240`;
+      // output with each of the wall palettes
+      for (let pal = 1; pal < 15; ++pal) {
+        paletteoverride = `Main_Base_Palette;240;wall_floor_palette_${pad2(pal)};224;wall_floor_palette_19`;
         for (let ii = 0; ; ++ii) {
           if (!procImage(1, `${filename}.${ii}`,
-            `out2/${cat}/${filename}_pal${pad2(pal)}.${pad2(ii)}.png`, paletteoverride)
+            `out2/${cat}/${filename}_wpal${pad2(pal)}.${pad2(ii)}.png`, paletteoverride)
           ) {
             break;
           }
@@ -266,7 +269,22 @@ function scanAll() {
         }
       }
     }
-    console.log(`${filename}: processed ${total} image(s)${twoforty ? ' (all palettes)' : ''}`);
+    if (twothirtyeight) {
+      // output with each of the floor palettes
+      for (let pal = 15; pal < 21; ++pal) {
+        paletteoverride = `Main_Base_Palette;240;wall_floor_palette_08;224;wall_floor_palette_${pad2(pal)}`;
+        for (let ii = 0; ; ++ii) {
+          if (!procImage(1, `${filename}.${ii}`,
+            `out2/${cat}/${filename}_fpal${pad2(pal)}.${pad2(ii)}.png`, paletteoverride)
+          ) {
+            break;
+          }
+          ++total;
+        }
+      }
+    }
+    console.log(`${filename}: processed ${total} image(s)${twoforty ? ' (all wall palettes)' : ''}` +
+      `${twothirtyeight ? ' (all floor palettes)' : ''}`);
     if (global.gc) {
       global.gc();
     }
@@ -275,7 +293,8 @@ function scanAll() {
 }
 
 function test() {
-  procImage(1, 'Main_screen.0');
+  mkdir('out');
+  procImage(1, 'Floor-2.0', null, 'Main_Base_Palette;240;wall_floor_palette_08;224;wall_floor_palette_19');
 }
 
 mkdir('out2');

@@ -31,4 +31,4 @@ function procdir(dir) {
 }
 
 mkdir('sheets');
-procdir('out3/walls');
+procdir('out3/walls_base');

@@ -13,6 +13,7 @@ Dungeon Hack Tile Extraction
   * See `tools/imagelist.txt` for that set
 * Copy the extracted fonts into `fonts/` as `8x8_font` and `ornate_font`
 * Copy `Main_Base_Palette.out`, `Diff_Base_Palette.out`, and `wall_floor_palette*.out` into `palettes/`
-* Run `proc.js` to convert and categorize all images
-* Run `makerows.js` to combine related images into a single image with labels and rows - may want to tweak some options at the end of that file
-* Run `makesheet.js` to combine rows into a tilesheet with a header
+* Install Node.js and run `npm install`
+* Run `node --expose-gc proc.js` to convert and categorize all images
+* Run `node --expose-gc makerows.js` to combine related images into a single image with labels and rows - may want to tweak some options at the end of that file
+* Run `node makesheet.js` to combine rows into a tilesheet with a header

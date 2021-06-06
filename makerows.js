@@ -43,8 +43,8 @@ function procdir(dir, combine_all) {
       let start = filename.match(/(.*)\.[0-9a-f]+(?:_\d+)?\.png/)[1];
       by_start[start] = by_start[start] || [];
       by_start[start].push(filename);
-      if (start.endsWith('_pal01')) {
-        needs_pal0[start.slice(0, -'_pal01'.length)] = true;
+      if (start.endsWith('_wpal01')) {
+        needs_pal0[start.slice(0, -'_wpal01'.length)] = true;
       }
     }
   }
@@ -102,7 +102,7 @@ function procdir(dir, combine_all) {
     //fs.writeFileSync(`out/${imgfile}.png`, buffer);
 
     if (needs_pal0[start]) {
-      start += '_pal00';
+      start += '_wpal00';
     }
     let out_file = `${dir.replace('out2', 'out3')}/${start}.png`;
     mkdir(path.dirname(out_file));
